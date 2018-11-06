@@ -5,7 +5,7 @@ import librosa
 # Warning! Loads 3.4 GB of wav to ram!!!
 # Use LibRosa
 
-dataPath = '/home/marflo356/Documents/CSCI4352/Charm/Data/IRMAS/IRMAS-TrainingData/'
+dataPath = str(os.environ['IRMAS'])
 folders = ('cel/', 'cla/', 'flu/', 'gac/', 'gel/', 'org/', 'pia/', 'sax/', 'tru/', 'vio/', 'voi/')
 
 
