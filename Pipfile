@@ -9,6 +9,7 @@ name = "pypi"
 tensorflow = "==1.9.0"
 numpy = "*"
 librosa = "*"
+sklearn = "*"
 
 [requires]
 python_version = "3.6"
