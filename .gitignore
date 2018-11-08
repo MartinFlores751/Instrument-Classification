@@ -1,1 +1,6 @@
+# PyCharm Ignore
 .idea/*
+
+# Emacs ignore
+\#*#
+*~
