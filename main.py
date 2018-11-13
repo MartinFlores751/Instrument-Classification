@@ -41,6 +41,7 @@ def folders_to_one_hot():
         yLabels.append(folder[:-1])
     # TODO: Use sklearn onehot to convert labels!
 
+
 def main():
     data = parse_files_to_np()
 
