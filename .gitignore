@@ -1,6 +1,14 @@
 # PyCharm Ignore
 .idea/*
 
+# Data files
+data/*
+
+# PipEnv
+Pipfile.lock
+.env
+
 # Emacs ignore
 \#*#
 *~
+.#*
