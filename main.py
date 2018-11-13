@@ -43,13 +43,17 @@ def parse_files_to_np():
 
 
 def one_hot_encode(labels):
-    enc = LabelBinarizer()
+    enc = LabelBinarizer(sparse_output=True)
     one_hot_encoded = enc.fit_transform(labels)
     return one_hot_encoded
+
 
 # THIS IS FOR TESTING!!!
 # TODO: Get more methods to train and run
 def MNN(train_x, train_y, test_x, test_y):
+    print("Train X: ", train_x)
+    print("Train Y: ", train_y)
+    
     training_epochs = 50
     n_dim = train_x.shape[1]
     n_classes = 2
@@ -73,8 +77,6 @@ def MNN(train_x, train_y, test_x, test_y):
     b = tf.Variable(tf.random_normal([n_classes], mean = 0, stddev=sd))
     y_ = tf.nn.softmax(tf.matmul(h_2,W) + b)
 
-    init = tf.initialize_all_variables()
-
     cost_function = -tf.reduce_sum(Y * tf.log(y_))
     optimizer = tf.train.GradientDescentOptimizer(learning_rate).minimize(cost_function)
 
@@ -83,7 +85,7 @@ def MNN(train_x, train_y, test_x, test_y):
 
     y_true, y_pred = None, None
     with tf.Session() as sess:
-        sess.run(init)
+        tf.global_variables_initializer()
         for epoch in range(training_epochs):            
             _,cost = sess.run([optimizer,cost_function],feed_dict={X:train_x,Y:train_y})
             print("Current Cost: ", cost)
@@ -91,8 +93,8 @@ def MNN(train_x, train_y, test_x, test_y):
     
 def main():
     print("Reading Files...")
-    X, y = parse_files_to_np()
-    y = one_hot_encode(y)
+    X, y_temp = parse_files_to_np()
+    y = one_hot_encode(y_temp)
     print("Done Reading!!!")
     print("Training MNN...")
     MNN(X, y, None, None)
