@@ -7,11 +7,12 @@ import tensorflow as tf
 # Very slooooow!!!!
 # Keep it simple!!! Using two instruments for now...
 # Warning! Loads 3.4 GB of wav to ram!!!
+# There is an error in some variable initialization
 
 dataPath = os.environ['IRMAS']
-folders = ('cel/', 'cla/')
+folders = ('cel/', 'cla/', 'flu/')
 
-# , 'flu/', 'gac/', 'gel/', 'org/', 'pia/', 'sax/', 'tru/', 'vio/', 'voi/')
+# , 'gac/', 'gel/', 'org/', 'pia/', 'sax/', 'tru/', 'vio/', 'voi/')
 
 def list_files(path):
     return tuple(os.listdir(path))
@@ -43,9 +44,8 @@ def parse_files_to_np():
 
 
 def one_hot_encode(labels):
-    enc = LabelBinarizer(sparse_output=True)
-    one_hot_encoded = enc.fit_transform(labels)
-    return one_hot_encoded
+    enc = LabelBinarizer()
+    return enc.fit_transform(labels)
 
 
 # THIS IS FOR TESTING!!!
@@ -53,15 +53,18 @@ def one_hot_encode(labels):
 def MNN(train_x, train_y, test_x, test_y):
     print("Train X: ", train_x)
     print("Train Y: ", train_y)
-    
+
+    print("\nThe shape of X: ", train_x.shape)
+    print("\nThe shape of Y: ", train_y.shape)
+
     training_epochs = 50
     n_dim = train_x.shape[1]
-    n_classes = 2
-    n_hidden_units_one = 280 
+    n_classes = 3
+    n_hidden_units_one = 280
     n_hidden_units_two = 300
     sd = 1 / np.sqrt(n_dim)
     learning_rate = 0.01
-    
+
     X = tf.placeholder(tf.float32, [None, n_dim])
     Y = tf.placeholder(tf.float32, [None, n_classes])
 
@@ -69,7 +72,7 @@ def MNN(train_x, train_y, test_x, test_y):
     b_1 = tf.Variable(tf.random_normal([n_hidden_units_one], mean = 0, stddev=sd))
     h_1 = tf.nn.tanh(tf.matmul(X,W_1) + b_1)
 
-    W_2 = tf.Variable(tf.random_normal([n_hidden_units_one,n_hidden_units_two], mean = 0, stddev=sd))
+    W_2 = tf.Variable(tf.random_normal([n_hidden_units_one, n_hidden_units_two], mean = 0, stddev=sd))
     b_2 = tf.Variable(tf.random_normal([n_hidden_units_two], mean = 0, stddev=sd))
     h_2 = tf.nn.sigmoid(tf.matmul(h_1,W_2) + b_2)
 
@@ -84,17 +87,22 @@ def MNN(train_x, train_y, test_x, test_y):
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
     y_true, y_pred = None, None
+    tf.global_variables_initializer()
     with tf.Session() as sess:
-        tf.global_variables_initializer()
-        for epoch in range(training_epochs):            
+        for epoch in range(training_epochs):
             _,cost = sess.run([optimizer,cost_function],feed_dict={X:train_x,Y:train_y})
             print("Current Cost: ", cost)
 
-    
+
 def main():
     print("Reading Files...")
     X, y_temp = parse_files_to_np()
     y = one_hot_encode(y_temp)
+    print("Y is now: ", y)
+    print("X is now: ", X)
+    print("Y shape is: ", y.shape)
+    print("X shape is: ", X.shape)
+
     print("Done Reading!!!")
     print("Training MNN...")
     MNN(X, y, None, None)
