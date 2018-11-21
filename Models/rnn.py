@@ -1,3 +1,4 @@
+
 import os
 from sklearn.preprocessing import LabelBinarizer
 import librosa
@@ -37,7 +38,7 @@ def parse_files_to_np():
     labels = np.empty(0)
     for folder in folders:
         files_in_folder = list_files(dataPath + folder)
-        print("Extraing data for the " + folder[:-1] + " instrument.")
+        print("Extracting data for the " + folder[:-1] + " instrument.")
         for file in files_in_folder:
             mfccs, chroma, mel, contrast, tonnetz = extract_features(file, folder)
             features = np.hstack([mfccs, chroma, mel, contrast, tonnetz])
@@ -94,11 +95,11 @@ def MNN(train_x, train_y, test_x, test_y):
             print("Current Cost: ", cost)
 
 
-def run():
+def rnn_run():
+    print('#'*20, "Running RNN classifier", '#'*20)
     print("Reading Files...")
     X, y = parse_files_to_np()
     y = one_hot_encode(y)
     print("Done Reading!!!")
     print("Training MNN...")
     MNN(X, y, None, None)
-

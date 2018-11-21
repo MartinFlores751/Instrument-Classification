@@ -1,4 +1,7 @@
-from DataManager import datacore as dm
+import Models.classfier as C
 
 if __name__ == '__main__':
-    dm.run()
+    """Instrument classifier"""
+    
+    # Options: "knn", "svm", "dtree", "rnn"
+    IC = C.InstrumentClassifier("rnn")
