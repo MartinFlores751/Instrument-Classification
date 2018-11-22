@@ -13,3 +13,8 @@ Pipfile.lock
 \#*#
 *~
 .#*
+
+DataHandler/__pycache__/*
+Models/__pycache__/*
+Models/CrossValidation/__pycache__/*
+Utilities/__pycache__/*
