@@ -1,4 +1,4 @@
-from DataManager import data_man as dm
+from DataHandler import data_man as dm
 from . import svm, knn, dtree, rnn
 
 
