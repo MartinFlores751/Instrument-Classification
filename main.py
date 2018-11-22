@@ -59,8 +59,6 @@ def one_hot_encode(labels):
     return enc.fit_transform(labels)
 
 
-# THIS IS FOR TESTING!!!
-# TODO: Get more methods to train and run
 def MNN(train_x, train_y, test_x, test_y):
     print("Train X: ", train_x)
     print("Train Y: ", train_y)
