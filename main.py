@@ -69,6 +69,7 @@ def parse_test_files_to_np():
 
     for folder in testFolders:
         files_in_folder = list_files(testPath + folder)
+        print("Extracting data from the " + folder + " folder.")
 
         proper_files = []
 
@@ -95,12 +96,6 @@ def one_hot_encode(labels):
 
 
 def MNN(train_x, train_y, test_x, test_y):
-    print("Train X: ", train_x)
-    print("Train Y: ", train_y)
-
-    print("\nThe shape of X: ", train_x.shape)
-    print("\nThe shape of Y: ", train_y.shape)
-
     training_epochs = 5000
     n_dim = train_x.shape[1]
     n_classes = 3
@@ -149,7 +144,7 @@ def MNN(train_x, train_y, test_x, test_y):
         y_pred = sess.run(tf.argmax(hypothesis, 1), feed_dict={X: test_x})
         y_true = sess.run(tf.argmax(test_y, 1))
 
-        print("Test accuracy: ", round(session.run(accuracy,
+        print("Test accuracy: ", round(sess.run(accuracy,
                                                    feed_dict={X: test_x,
                                                               Y: test_y}),
                                        3))
@@ -164,13 +159,9 @@ def main():
     testX, test_y_temp = parse_test_files_to_np()
     test_y = one_hot_encode(test_y_temp)
 
-    print("Y is now: ", test_y)
-    print("X is now: ", testX)
-    print("Y shape is: ", y.shape)
-    print("X shape is: ", X.shape)
-
     print("Done Reading!!!")
     print("Training MNN...")
+
     MNN(trainX, train_y, testX, test_y)
 
 
