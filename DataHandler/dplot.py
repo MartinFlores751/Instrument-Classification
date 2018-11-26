@@ -2,11 +2,11 @@ import matplotlib.pyplot as plt
 import IPython
 from pylab import plot, show, figure, imshow
 
-plot = True  # Set to False for no plotting
+plot_data = True  # Set to False for no plotting
 
 def plotAudioSignal(audio, audio_file):
     """Plots the entire excerpt of audio"""
-    if plot:
+    if plot_data is True:
         IPython.display.Audio(audio_file)
 
         plt.rcParams['figure.figsize'] = (15, 6) # Set plot size something bigger than default
@@ -18,7 +18,7 @@ def plotAudioSignal(audio, audio_file):
 
 
 def plotDescriptor(desc, message):
-    if plot:
+    if plot_data is True:
         plot(desc)
         plt.title(message)
         show()
