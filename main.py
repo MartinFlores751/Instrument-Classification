@@ -10,8 +10,9 @@ np.set_printoptions(threshold=np.inf)
 
 trainPath = os.environ['IRMAS_TRAIN']
 testPath = os.environ['IRMAS_TEST']
-trainFolders = ('cel/', 'cla/') # 'flu/', 'gac/', 'gel/', 'org/', 'pia/', 'sax/', 'tru/', 'vio/', 'voi/')
-testFolders = ('tmp/', 'tmp2/') # ()'Part3/')
+trainFolders = ('cel/', 'cla/', 'flu/') # ('gac/', 'gel/', 'org/', 'pia/', 'sax/', 'tru/', 'vio/', 'voi/')
+testFolders = ('tmp/', 'tmp2/') # ('Part3/')
+num_classes = len(trainFolders)
 
 
 def list_files(path):
@@ -62,7 +63,7 @@ def parse_train_files_to_np():
     Reads trainPath and tainFolders to parse traning files
     """
     data = np.empty((0, 13780))
-    labels = np.empty((0, 11))
+    labels = np.empty((0, num_classes))
     for folder in trainFolders:
         files_in_folder = list_files(trainPath + folder)
         print("Extracting data for the " + folder[:-1] + " instrument.")
@@ -84,7 +85,7 @@ def parse_test_files_to_np():
     Reads testPath and testFolder to parse test folders
     """
     data = np.empty((0, 13780))
-    labels = np.empty((0, 11))
+    labels = np.empty((0, num_classes))
 
     for folder in testFolders:
         files_in_folder = list_files(testPath + folder)
@@ -125,13 +126,15 @@ def parse_test_files_to_np():
 
 
 def one_hot_encode(labels):
+    valid_labels = []
+    for folder in trainFolders:
+        valid_labels.append(folder[:-1])
+    
     enc = LabelBinarizer()
-    enc.fit(
-    ['cel', 'cla', 'flu', 'gac', 'gel', 'org',
-    'pia', 'sax', 'tru', 'vio', 'voi'])
+    enc.fit(valid_labels)
     pre_labels = enc.transform(labels)
 
-    final_label = np.zeros(11)
+    final_label = np.zeros(num_classes)
 
     for label in pre_labels:
         for valid_label in trainFolders:
@@ -161,30 +164,26 @@ def isGood(result):
 def MNN(train_x, train_y, test_x, test_y):
     training_epochs = 5000
     n_dim = train_x.shape[1]
-    n_classes = 11
+    n_classes = num_classes
     n_hidden_units_one = 280
     n_hidden_units_two = 300
     sd = 1 / np.sqrt(n_dim)
-    learning_rate = 0.00001
+    learning_rate = 0.0001
 
     X = tf.placeholder(tf.float32, [None, n_dim])
     Y = tf.placeholder(tf.float32, [None, n_classes])
 
-    W1 = tf.Variable(tf.random_normal([n_dim, n_hidden_units_one], mean=0,
-                                       stddev=sd))
-    b1 = tf.Variable(tf.random_normal([n_hidden_units_one], mean=0,
-                                       stddev=sd))
+    W1 = tf.Variable(tf.random_normal([n_dim, n_hidden_units_one]))
+    b1 = tf.Variable(tf.random_normal([n_hidden_units_one]))
     layer1 = tf.nn.tanh(tf.matmul(X, W1) + b1)
 
     W2 = tf.Variable(tf.random_normal(
-        [n_hidden_units_one, n_hidden_units_two], mean=0, stddev=sd))
-    b2 = tf.Variable(tf.random_normal([n_hidden_units_two], mean=0,
-                                       stddev=sd))
+        [n_hidden_units_one, n_hidden_units_two]))
+    b2 = tf.Variable(tf.random_normal([n_hidden_units_two]))
     layer2 = tf.nn.sigmoid(tf.matmul(layer1, W2) + b2)
 
-    W = tf.Variable(tf.random_normal([n_hidden_units_two, n_classes], mean=0,
-                                     stddev=sd))
-    b = tf.Variable(tf.random_normal([n_classes], mean=0, stddev=sd))
+    W = tf.Variable(tf.random_normal([n_hidden_units_two, n_classes]))
+    b = tf.Variable(tf.random_normal([n_classes]))
     hypothesis = tf.nn.softmax(tf.matmul(layer2, W) + b)
 
     cost_function = -tf.reduce_sum(Y * tf.log(hypothesis))
