@@ -11,6 +11,9 @@ numpy = "*"
 librosa = "*"
 sklearn = "*"
 essentia = "*"
+matplotlib = "*"
+scipy = "*"
+ipython = "*
 
 [requires]
 python_version = "3.6"
