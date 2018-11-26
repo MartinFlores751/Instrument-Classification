@@ -1,18 +1,16 @@
 import os
 from sklearn.preprocessing import LabelBinarizer
 import librosa
+import essentia
+from essentia.streaming import *
 import numpy as np
 import tensorflow as tf
 
-# Very slooooow!!!!
-# Keep it simple!!! Using two instruments for now...
-# Warning! Loads 3.4 GB of wav to ram!!!
-# There is an error in some variable initialization
 
 trainPath = os.environ['IRMAS_TRAIN']
 testPath = os.environ['IRMAS_TEST']
-trainFolders = ('cel/', 'cla/', 'flu/') # ('gac/', 'gel/', 'org/', 'pia/', 'sax/', 'tru/', 'vio/', 'voi/')
-testFolders = ('Part1/', 'Part2/') # ('part2/', 'part3/')
+trainFolders = ('cel/', 'cla/') # ('flu/', 'gac/', 'gel/', 'org/', 'pia/', 'sax/', 'tru/', 'vio/', 'voi/')
+testFolders = ('Part1/', 'Part2/') # ('Part3/')
 
 
 def list_files(path):
@@ -20,16 +18,29 @@ def list_files(path):
 
 
 def extract_features(file, folder):
-    y, sr = librosa.load(folder + file, mono=True)
-    stft = np.abs(librosa.stft(y))
-    mfccs = np.mean(librosa.feature.mfcc(y, sr, n_mfcc=40).T, axis=0)
-    chroma = np.mean(librosa.feature.chroma_stft(S=stft, sr=sr).T, axis=0)
-    mel = np.mean(librosa.feature.melspectrogram(y, sr).T, axis=0)
-    contrast = np.mean(librosa.feature.spectral_contrast(S=stft, sr=sr).T,
-                       axis=0)
-    tonnetz = np.mean(librosa.feature.tonnetz(
-        y=librosa.effects.harmonic(y), sr=sr).T, axis=0)
-    return mfccs, chroma, mel, contrast, tonnetz
+    # New code
+    full_file_path = folder + file
+
+    file_loader = MonoLoader(filename=full_file_path)
+    frameCutter = FrameCutter(frameSize=1024, hopSize=512)
+    w = Windowing(type = 'hann')
+
+    spec = Spectrum()
+    specCont = SpectralContrast()
+    mfcc = MFCC()
+
+    pool = essentia.Pool()
+
+    file_loader.audio >> frameCutter.signal
+    frameCutter.frame >> w.frame >> spec.frame
+    spec.spectrum >> mfcc.spectrum
+
+    mfcc.bands >> (pool, 'lowlevel.bands')
+    mfcc.mfcc >> (pool, 'lowlevel.mfcc')
+
+    essentia.run(file_loader)
+
+    return pool['lowlevel.mfcc'], pool['lowlevel.bands']
 
 
 def get_label_from_txt(file_path):
@@ -45,16 +56,16 @@ def parse_train_files_to_np():
     """
     Reads trainPath and tainFolders to parse traning files
     """
-    data = np.empty((0, 193))
+    data = np.empty((0, 13780))
     labels = np.empty(0)
     for folder in trainFolders:
         files_in_folder = list_files(trainPath + folder)
-        print("Extraing data for the " + folder[:-1] + " instrument.")
+        print("Extracting data for the " + folder[:-1] + " instrument.")
         for file in files_in_folder:
-            mfccs, chroma, mel, contrast, tonnetz = extract_features(
-                                                            file,
-                                                            trainPath + folder)
-            features = np.hstack([mfccs, chroma, mel, contrast, tonnetz])
+            mfccs, bands = extract_features(file, trainPath + folder)
+            mfccs = mfccs.flatten()
+            bands = bands.flatten()
+            features = np.hstack([mfccs, bands])
             data = np.vstack([data, features])
             labels = np.append(labels, folder[:-1])
     return data, labels
@@ -64,7 +75,7 @@ def parse_test_files_to_np():
     """
     Reads testPath and testFolder to parse test folders
     """
-    data = np.empty((0, 193))
+    data = np.empty((0, 13780))
     labels = np.empty(0)
 
     for folder in testFolders:
@@ -78,10 +89,12 @@ def parse_test_files_to_np():
                 proper_files.append(file[:-4])
 
         for file in proper_files:
-            mfccs, chroma, mel, contrast, tonnetz = extract_features(
-                                                            file + ".wav",
-                                                            testPath + folder)
-            features = np.hstack([mfccs, chroma, mel, contrast, tonnetz])
+            mfccs, bands = extract_features(file + ".wav", testPath + folder)
+            mfccs = mfccs[:260][:]
+            bands = bands[:260][:]
+            mfccs = mfccs.flatten()
+            bands = bands.flatten()
+            features = np.hstack([mfccs, bands])
             data = np.vstack([data, features])
             labels = np.append(labels, get_label_from_txt(
                                             testPath + folder + file + ".txt"))
@@ -89,16 +102,18 @@ def parse_test_files_to_np():
     return data, labels
 
 
-# change so each label has the same enoding (a = [0, 1], b = [1, 0])
 def one_hot_encode(labels):
     enc = LabelBinarizer()
-    return enc.fit_transform(labels)
+    enc.fit(
+    ['cel', 'cla', 'flu', 'gac', 'gel', 'org',
+    'pia', 'sax', 'tru', 'vio', 'voi'])
+    return enc.transform(labels)
 
 
 def MNN(train_x, train_y, test_x, test_y):
     training_epochs = 5000
     n_dim = train_x.shape[1]
-    n_classes = 3
+    n_classes = 11
     n_hidden_units_one = 280
     n_hidden_units_two = 300
     sd = 1 / np.sqrt(n_dim)
