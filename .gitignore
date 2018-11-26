@@ -5,10 +5,12 @@
 data/*
 
 # PipEnv
-Pipfile.lock
 .env
 
 # Emacs ignore
 \#*#
 *~
 .#*
+
+# VsCode ignore
+.vscode/*
