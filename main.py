@@ -6,6 +6,7 @@ from essentia.streaming import *
 import numpy as np
 import tensorflow as tf
 
+np.set_printoptions(threshold=np.inf)
 
 trainPath = os.environ['IRMAS_TRAIN']
 testPath = os.environ['IRMAS_TEST']
@@ -68,7 +69,7 @@ def parse_train_files_to_np():
         for file in files_in_folder:
             file_label = []
             file_label.append(folder[:-1])
-            file_label = (one_hot_encode(file_label))
+            file_label = one_hot_encode(file_label)
             mfccs, bands = extract_features(file, trainPath + folder)
             mfccs = mfccs.flatten()
             bands = bands.flatten()
@@ -130,12 +131,31 @@ def one_hot_encode(labels):
     'pia', 'sax', 'tru', 'vio', 'voi'])
     pre_labels = enc.transform(labels)
 
-    final_label = pre_labels[0]
+    final_label = np.zeros(11)
 
-    for label in pre_labels[1:]:
-        final_label = np.add(label, final_label)
+    for label in pre_labels:
+        for valid_label in trainFolders:
+            if np.array_equal(label, enc.transform([valid_label[:-1]]).flatten()):
+                final_label = np.add(label, final_label)
 
     return final_label
+
+def isGood(result):
+    num_rows = 0
+    num_good = 0.0
+    for row in result:
+        num_rows += 1
+        good = True
+        for col in result:
+            for elem in col:
+                if elem == False:
+                    good = False
+                    break
+
+        if good == True:
+            num_good += 1
+
+    return num_good / num_rows
 
 
 def MNN(train_x, train_y, test_x, test_y):
@@ -145,7 +165,7 @@ def MNN(train_x, train_y, test_x, test_y):
     n_hidden_units_one = 280
     n_hidden_units_two = 300
     sd = 1 / np.sqrt(n_dim)
-    learning_rate = 0.0001
+    learning_rate = 0.00001
 
     X = tf.placeholder(tf.float32, [None, n_dim])
     Y = tf.placeholder(tf.float32, [None, n_classes])
@@ -172,7 +192,8 @@ def MNN(train_x, train_y, test_x, test_y):
         cost_function)
 
     predicted = tf.cast(hypothesis > 0.5, dtype=tf.float32)
-    accuracy = tf.reduce_mean(tf.cast(tf.equal(predicted, Y), dtype=tf.float32))
+    intermediate = tf.equal(predicted, Y)
+    accuracy = tf.reduce_mean(tf.cast(intermediate, dtype=tf.float32))
 
     y_true, y_pred = None, None
     with tf.Session() as sess:
@@ -183,12 +204,15 @@ def MNN(train_x, train_y, test_x, test_y):
                                 feed_dict={X: train_x, Y: train_y})
 
             if epoch % 500 == 0:
-                cost, pred, acc = sess.run([cost_function, predicted, accuracy],
+                inter, raw, pred, acc = sess.run(
+                            [intermediate, hypothesis, predicted, accuracy],
                             feed_dict={X: test_x,
                                        Y: test_y})
-                print("Predicted is: ", pred)
-                print("Acutual is: ", test_y)
-                print("Accuracy is: ", acc)
+                print("Raw:\n", raw)
+                print("Predicted is:\n", pred)
+                print("Actual is:\n", test_y)
+                print("Accuracy is: ", acc, "%")
+                print("True Acc is: ", isGood(inter))
                 print("Current Cost: ", cost)
 
 
@@ -198,8 +222,8 @@ def main():
     trainX, train_y = parse_train_files_to_np()
     testX, test_y = parse_test_files_to_np()
 
-    print(train_y)
-    print(test_y)
+    print("Train Y:\n", train_y)
+    print("Test Y:\n", test_y)
 
     print("Done Reading!!!")
     print("Training MNN...")
