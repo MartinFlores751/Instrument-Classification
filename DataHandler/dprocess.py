@@ -4,6 +4,7 @@ import essentia.standard as es
 import matplotlib.pyplot as plt
 from pylab import plot, show, figure, imshow
 from . import dplot as df
+from . import dstorage as ds
 
 training_data_path = [
     'IRMAS/flu/',
@@ -18,7 +19,8 @@ training_data_path = [
     'IRMAS/vio/',
     'IRMAS/voi/',
 ]
-pool = essentia.Pool()  # A container that will contain extracted feature values
+pool = essentia.Pool()
+features_pool = []
 
 
 def run():
@@ -39,23 +41,66 @@ def readSingleAudio(audioname):
 
 def readAudioExcerpts():
 
-    # extractSpectralFeatures(audio)
-    for audiofile in os.listdir(training_data_path[2]):
-        extractAllFeatures(training_data_path[2]+audiofile)
+    global features_pool
+
+    for _class_ in range(len(training_data_path)):
+        class_name = training_data_path[_class_]
+        for file in os.listdir(training_data_path[_class_]):
+            feats = extractAllFeatures(class_name, file)
+            features_pool.append(feats)
+        ds.saveToCSV(class_name, features_pool)
+        features_pool = []
 
 
-def extractAllFeatures(audiofile):
+def extractAllFeatures(dir_, file):
     """Extracts a large set of the following group features:
         low-level features, rhythm features, and tonal features
         from a IRMAS audio excerpt"""
 
+    audiofile = dir_ + file
     print("FILE: ", audiofile)
 
     features, features_frames = es.MusicExtractor(
         profile='DataHandler/feature_profile.yml')(audiofile)
 
-    # print(sorted(features.descriptorNames()))
-    print("Tuning frequency", features['tonal.tuning_frequency'])  # Example
+    aggrPool = es.PoolAggregator(defaultStats=['mean', 'stdev'])(features)
+    es.YamlOutput(filename='Yaml/'+audiofile+'__pool')(aggrPool)
+
+    feats = saveFeatures(aggrPool)
+
+    return feats
+
+
+def saveFeatures(aggrPool):
+    """Collects a set of features from the large feature pool"""
+
+    feature_bucket = []
+
+    feature_bucket.append(aggrPool['lowlevel.melbands.mean.mean'])
+    feature_bucket.append(aggrPool['lowlevel.melbands_crest.mean'])
+    feature_bucket.append(aggrPool['lowlevel.melbands_spread.mean'])
+
+    feature_bucket.append(aggrPool['lowlevel.mfcc.mean.mean'])
+    feature_bucket.append(aggrPool['lowlevel.mfcc.mean.stdev'])
+
+    feature_bucket.append(aggrPool['lowlevel.spectral_centroid.mean'])
+    feature_bucket.append(aggrPool['lowlevel.spectral_energy.mean'])
+    feature_bucket.append(aggrPool['lowlevel.spectral_flux.mean'])
+    feature_bucket.append(aggrPool['lowlevel.spectral_spread.mean'])
+    feature_bucket.append(aggrPool['lowlevel.spectral_rms.mean'])
+    feature_bucket.append(aggrPool['lowlevel.spectral_complexity.mean'])
+    feature_bucket.append(aggrPool['lowlevel.pitch_salience.mean'])
+    feature_bucket.append(aggrPool['lowlevel.zerocrossingrate.mean'])
+
+    feature_bucket.append(aggrPool['tonal.chords_changes_rate'])
+    feature_bucket.append(aggrPool['tonal.hpcp.mean.mean'])
+    feature_bucket.append(aggrPool['tonal.hpcp.stdev.stdev'])
+    feature_bucket.append(aggrPool['tonal.hpcp_crest.mean'])
+    feature_bucket.append(aggrPool['tonal.hpcp_entropy.mean'])
+
+    feature_bucket.append(aggrPool['rhythm.onset_rate'])
+
+    return feature_bucket
 
 
 def extractSpectralFeatures(audio):
@@ -83,5 +128,5 @@ def extractSpectralFeatures(audio):
     show()
 
     imshow(pool['lowlevel.mfcc'].T[1:, :], aspect='auto', origin='lower', interpolation='none')
-    plt.title("MfCCs in frames")
+    plt.title("MFCCs in frames")
     show()
