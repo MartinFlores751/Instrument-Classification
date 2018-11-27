@@ -1,5 +1,10 @@
 import os
 from sklearn.preprocessing import LabelBinarizer
+
+from skmultilearn.adapt import MLkNN
+from skmultilearn.dataset import load_dataset
+# from skmultilearn.dataset import save_to_arff
+
 import librosa
 import essentia
 from essentia.streaming import *
@@ -171,7 +176,7 @@ def MNN(train_x, train_y, test_x, test_y):
     n_hidden_units_one = 280
     n_hidden_units_two = 300
     sd = 1 / np.sqrt(n_dim)
-    learning_rate = 0.000001
+    learning_rate = 0.0000001
 
     X = tf.placeholder(tf.float32, [None, n_dim])
     Y = tf.placeholder(tf.float32, [None, n_classes])
@@ -219,19 +224,43 @@ def MNN(train_x, train_y, test_x, test_y):
                 print("Current Iter: ", epoch)
 
 
+def ML_KNN(X_train, y_train, test_x, test_y):
+    knn = MLkNN(k=2)
+    knn.fit(X_train, y_train)
+    prediction = knn.predict(test_x)
+    metrics.hamming_loss(test_y, prediction)
+
+
+def save_data_arff(X, y, f_name):
+    save_to_arff(X, y, label_location='start', save_sparse=True, filename=f_fname)
+
+    
+def load_data_arff(file_path):
+    return None
+
+
 def main():
     print("Reading Files...")
 
+    # Generate Data
     trainX, train_y = parse_train_files_to_np()
     testX, test_y = parse_test_files_to_np()
 
-    print("Train Y:\n", train_y)
-    print("Test Y:\n", test_y)
+    # Save Data
+    # save_data_arff(trainX, train_y, "train_data.arff")
+    # save_data_arff(testX, test_y, "test_data.arff")
+    
+    # Load Data
+    # load_data_arff()
+
+    print("Train X:\n", trainX.shape)
+    print("Train Y:\n", train_y.shape)
 
     print("Done Reading!!!")
     print("Training MNN...")
 
     MNN(trainX, train_y, testX, test_y)
+    # ML_KNN(trainX, train_y, testX, test_y)
 
 
 main()

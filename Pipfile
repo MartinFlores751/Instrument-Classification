@@ -11,6 +11,9 @@ numpy = "*"
 librosa = "*"
 sklearn = "*"
 essentia = "*"
+scikit-multilearn = "*"
+arff = "*"
+requests = "*"
 
 [requires]
 python_version = "3.6"
