@@ -16,8 +16,8 @@ np.set_printoptions(threshold=np.inf)
 
 trainPath = os.environ['IRMAS_TRAIN']
 testPath = os.environ['IRMAS_TEST']
-trainFolders = ('cel/', 'cla/', 'flu/') # ('gac/', 'gel/', 'org/', 'pia/', 'sax/', 'tru/', 'vio/', 'voi/')
-testFolders = ('tmp/', 'tmp2/') # ('Part3/')
+trainFolders = ('cel/', 'cla/', 'flu/')  # ('gac/', 'gel/', 'org/', 'pia/', 'sax/', 'tru/', 'vio/', 'voi/')
+testFolders = ('tmp/', 'tmp2/')  # ('Part3/')
 num_classes = len(trainFolders)
 
 
@@ -30,7 +30,7 @@ def extract_features(file, folder):
 
     file_loader = MonoLoader(filename=full_file_path)
     frameCutter = FrameCutter(frameSize=1024, hopSize=512)
-    w = Windowing(type = 'hann')
+    w = Windowing(type='hann')
 
     spec = Spectrum()
     specCont = SpectralContrast()
@@ -151,6 +151,7 @@ def one_hot_encode(labels):
 
     return final_label
 
+
 def isGood(result):
     num_rows = 0
     num_good = 0.0
@@ -159,11 +160,11 @@ def isGood(result):
         good = True
         for col in result:
             for elem in col:
-                if elem == False:
+                if elem is False:
                     good = False
                     break
 
-        if good == True:
+        if good is True:
             num_good += 1
 
     return num_good / num_rows
@@ -208,7 +209,7 @@ def MNN(train_x, train_y, test_x, test_y):
 
         for epoch in range(training_epochs):
             _, cost = sess.run([optimizer, cost_function],
-                                feed_dict={X: train_x, Y: train_y})
+                               feed_dict={X: train_x, Y: train_y})
 
             if epoch % 5000 == 0:
                 inter, raw, pred, acc = sess.run(
@@ -224,17 +225,30 @@ def MNN(train_x, train_y, test_x, test_y):
                 print("Current Iter: ", epoch)
 
 
-def ML_KNN(X_train, y_train, test_x, test_y):
+def ML_KNN(train_x, train_y, test_x, test_y):
     knn = MLkNN(k=2)
-    knn.fit(X_train, y_train)
+    knn.fit(train_x, train_y)
     prediction = knn.predict(test_x)
     metrics.hamming_loss(test_y, prediction)
+
+
+def RNN(train_x, train_y, test_x, test_y):
+    num_epochs = 100
+    total_series_length = 50000
+    truncated_backprop_length = 15
+    state_size = 4
+    num_classes = 2
+    echo_step = 3
+    batch_size = 5
+    num_batches = total_series_length//batch_size//truncated_backprop_length
+
+    return None
 
 
 def save_data_arff(X, y, f_name):
     save_to_arff(X, y, label_location='start', save_sparse=True, filename=f_fname)
 
-    
+
 def load_data_arff(file_path):
     return None
 
@@ -249,7 +263,7 @@ def main():
     # Save Data
     # save_data_arff(trainX, train_y, "train_data.arff")
     # save_data_arff(testX, test_y, "test_data.arff")
-    
+
     # Load Data
     # load_data_arff()
 
