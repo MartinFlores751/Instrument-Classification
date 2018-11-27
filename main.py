@@ -5,6 +5,7 @@ import essentia
 from essentia.streaming import *
 import numpy as np
 import tensorflow as tf
+import re
 
 np.set_printoptions(threshold=np.inf)
 
@@ -34,14 +35,18 @@ def extract_features(file, folder):
 
     file_loader.audio >> frameCutter.signal
     frameCutter.frame >> w.frame >> spec.frame
-    spec.spectrum >> mfcc.spectrum
 
-    mfcc.bands >> (pool, 'lowlevel.bands')
+    spec.spectrum >> mfcc.spectrum
+    mfcc.bands >> (pool, 'lowlevel.mel_bands')
     mfcc.mfcc >> (pool, 'lowlevel.mfcc')
 
     essentia.run(file_loader)
 
-    return pool['lowlevel.mfcc'], pool['lowlevel.bands']
+    return pool['lowlevel.mfcc'], pool['lowlevel.mel_bands']
+
+
+def get_labels_from_name(file):
+    return re.findall(r"\[([A-Za-z0-9_]+)\]", file)
 
 
 def get_label_from_txt(file_path):
@@ -62,19 +67,20 @@ def parse_train_files_to_np():
     """
     Reads trainPath and tainFolders to parse traning files
     """
-    data = np.empty((0, 13780))
+    data = np.empty((0, 53))
     labels = np.empty((0, num_classes))
     for folder in trainFolders:
         files_in_folder = list_files(trainPath + folder)
         print("Extracting data for the " + folder[:-1] + " instrument.")
         for file in files_in_folder:
-            file_label = []
-            file_label.append(folder[:-1])
+            file_label = get_labels_from_name(file)
             file_label = one_hot_encode(file_label)
-            mfccs, bands = extract_features(file, trainPath + folder)
-            mfccs = mfccs.flatten()
-            bands = bands.flatten()
-            features = np.hstack([mfccs, bands])
+
+            mfccs, mel_bands = extract_features(file, trainPath + folder)
+            mfccs = np.mean(mfccs, axis=0)
+            mel_bands = np.mean(mel_bands, axis=0)
+
+            features = np.hstack([mfccs, mel_bands])
             data = np.vstack([data, features])
             labels = np.vstack((labels, file_label))
     return data, labels
@@ -84,7 +90,7 @@ def parse_test_files_to_np():
     """
     Reads testPath and testFolder to parse test folders
     """
-    data = np.empty((0, 13780))
+    data = np.empty((0, 53))
     labels = np.empty((0, num_classes))
 
     for folder in testFolders:
@@ -111,13 +117,10 @@ def parse_test_files_to_np():
                 continue
 
             mfccs, bands = extract_features(file + ".wav", testPath + folder)
+            mfccs = np.mean(mfccs, axis=0)
+            bands = np.mean(bands, axis=0)
 
-            mfccs = mfccs[:260][:]
-            bands = bands[:260][:]
-
-            mfccs = mfccs.flatten()
-            bands = bands.flatten()
-
+            features = np.hstack([mfccs, bands])
             features = np.hstack([mfccs, bands])
             data = np.vstack([data, features])
             labels = np.vstack([labels, one_hot_encode(file_label)])
@@ -129,7 +132,7 @@ def one_hot_encode(labels):
     valid_labels = []
     for folder in trainFolders:
         valid_labels.append(folder[:-1])
-    
+
     enc = LabelBinarizer()
     enc.fit(valid_labels)
     pre_labels = enc.transform(labels)
@@ -162,13 +165,13 @@ def isGood(result):
 
 
 def MNN(train_x, train_y, test_x, test_y):
-    training_epochs = 5000
+    training_epochs = 50000
     n_dim = train_x.shape[1]
     n_classes = num_classes
     n_hidden_units_one = 280
     n_hidden_units_two = 300
     sd = 1 / np.sqrt(n_dim)
-    learning_rate = 0.0001
+    learning_rate = 0.000001
 
     X = tf.placeholder(tf.float32, [None, n_dim])
     Y = tf.placeholder(tf.float32, [None, n_classes])
@@ -202,7 +205,7 @@ def MNN(train_x, train_y, test_x, test_y):
             _, cost = sess.run([optimizer, cost_function],
                                 feed_dict={X: train_x, Y: train_y})
 
-            if epoch % 500 == 0:
+            if epoch % 5000 == 0:
                 inter, raw, pred, acc = sess.run(
                             [intermediate, hypothesis, predicted, accuracy],
                             feed_dict={X: test_x,
@@ -213,6 +216,7 @@ def MNN(train_x, train_y, test_x, test_y):
                 print("Accuracy is: ", acc, "%")
                 print("True Acc is: ", isGood(inter))
                 print("Current Cost: ", cost)
+                print("Current Iter: ", epoch)
 
 
 def main():
