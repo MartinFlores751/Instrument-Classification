@@ -1,5 +1,6 @@
 import os
 from sklearn.preprocessing import LabelBinarizer
+from sklearn.preprocessing import MinMaxScaler
 
 from skmultilearn.adapt import MLkNN
 from skmultilearn.dataset import load_dataset
@@ -16,8 +17,14 @@ np.set_printoptions(threshold=np.inf)
 
 trainPath = os.environ['IRMAS_TRAIN']
 testPath = os.environ['IRMAS_TEST']
-trainFolders = ('cel/', 'cla/', 'flu/')  # ('gac/', 'gel/', 'org/', 'pia/', 'sax/', 'tru/', 'vio/', 'voi/')
-testFolders = ('tmp/', 'tmp2/')  # ('Part3/')
+# Possible sets are:
+# ('cel/', 'cla/', 'flu/', 'gac/', 'gel/', 'org/', 'pia/', 'sax/', 'tru/', 'vio/', 'voi/')
+
+# Pia, Gel, and Voi have the most training samples, so let's use those
+# Replace Voi with Sax if you want pure instruments
+
+trainFolders = ('gel/', 'pia/', 'voi/')
+testFolders = ('Part1/', 'Part2/')  #('Part3/')
 num_classes = len(trainFolders)
 
 
@@ -157,11 +164,11 @@ def isGood(result):
     num_good = 0.0
     for row in result:
         num_rows += 1
-        good = True
+        good = False
         for col in result:
             for elem in col:
-                if elem is False:
-                    good = False
+                if elem is True:
+                    good = True
                     break
 
         if good is True:
@@ -177,7 +184,7 @@ def MNN(train_x, train_y, test_x, test_y):
     n_hidden_units_one = 280
     n_hidden_units_two = 300
     sd = 1 / np.sqrt(n_dim)
-    learning_rate = 0.0000001
+    learning_rate = 0.000001
 
     X = tf.placeholder(tf.float32, [None, n_dim])
     Y = tf.placeholder(tf.float32, [None, n_classes])
@@ -212,13 +219,12 @@ def MNN(train_x, train_y, test_x, test_y):
                                feed_dict={X: train_x, Y: train_y})
 
             if epoch % 5000 == 0:
-                inter, raw, pred, acc = sess.run(
-                            [intermediate, hypothesis, predicted, accuracy],
+                inter, raw, acc = sess.run(
+                            [intermediate, hypothesis, accuracy],
                             feed_dict={X: test_x,
                                        Y: test_y})
                 print("Raw:\n", raw)
-                print("Predicted is:\n", pred)
-                print("Actual is:\n", test_y)
+                print("Compare is:\n", inter)
                 print("Accuracy is: ", acc, "%")
                 print("True Acc is: ", isGood(inter))
                 print("Current Cost: ", cost)
@@ -259,6 +265,20 @@ def main():
     # Generate Data
     trainX, train_y = parse_train_files_to_np()
     testX, test_y = parse_test_files_to_np()
+
+    # Scale Data
+    mms = MinMaxScaler()
+    trainX = mms.fit_transform(trainX)
+    testX = mms.transform(testX)
+
+    # Shuffle the training data just in case...
+    train = np.append(trainX, train_y, axis=1)
+    np.random.shuffle(train)
+    print(train.shape)
+    
+    trainX = train[:, :-3]
+    train_y = train[:, -3:]
+    print(train_y.shape)
 
     # Save Data
     # save_data_arff(trainX, train_y, "train_data.arff")
