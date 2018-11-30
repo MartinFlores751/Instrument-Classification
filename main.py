@@ -30,7 +30,12 @@ def one_hot_encode(labels):
     enc.fit(valid_labels)
     labels = enc.transform(labels)
 
-    return label
+    final_label = np.zeros((1, num_classes))
+
+    for label in labels:
+        final_label = np.add(final_label, label)
+
+    return final_label
 
 
 def MNN(train_x, train_y, test_x, test_y):
@@ -117,7 +122,7 @@ def main():
     print("Reading Files...")
 
     # Load Features
-    data = pd.read_csv("test.csv")
+    data = pd.read_csv("data/gel-pia-sax[MFCC][MEL][53].csv")
 
     print("Done!\nProcessing files...")
     
@@ -130,18 +135,26 @@ def main():
 
     test_X = test.drop(["class_1", "class_2", "class_3"], axis=1)
     test_y = test[["class_1", "class_2", "class_3"]]
-    
-    # Binary Encoding!!!
-    train_y = one_hot_encode(train_y)
-    test_y = one_hot_encode(test_y)
+
+    # Fill in the empty values
+    train_y = train_y.fillna("")
+    test_y = test_y.fillna("")
+
+    # DataFram to np.array
+    train_y = train_y.values
+    test_y = test_y.values
+
+    # Dumb Binary Encoding!!!
+    train_y[:] = [one_hot_encode(instance) for instance in train_y]
+    test_y[:] = [one_hot_encode(instance) for instance in test_y]
     
     # Scale Data
     ss = StandardScaler()
-    trainX = ss.fit_transform(trainX)
-    testX = ss.transform(testX)
+    train_X = ss.fit_transform(train_X)
+    test_X = ss.transform(test_X)
 
     # Shuffle the training data just in case...
-    train = np.append(trainX, train_y, axis=1)
+    train = np.append(train_X, train_y, axis=1)
     np.random.shuffle(train)
     print(train.shape)
     
