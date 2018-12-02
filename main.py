@@ -1,8 +1,9 @@
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import KFold
+from sklearn.metrics import precision_score, recall_score
 
-from tools.dataset import FeatureExtractor
+# from tools.dataset import FeatureExtractor
 
 import numpy as np
 import pandas as pd
@@ -39,56 +40,60 @@ def one_hot_encode(labels):
 
 
 def MNN(train_x, train_y, test_x, test_y):
-    training_epochs = 50000
+    tf.reset_default_graph()
+    
+    training_epochs = 20000
     n_dim = train_x.shape[1]
     n_classes = num_classes
     n_hidden_units_one = 280
     n_hidden_units_two = 300
     sd = 1 / np.sqrt(n_dim)
-    learning_rate = 0.000001
+    learning_rate = 0.3
 
-    X = tf.placeholder(tf.float32, [None, n_dim])
-    Y = tf.placeholder(tf.float32, [None, n_classes])
+    X = tf.placeholder(tf.float32, [None, n_dim], name="X")
+    Y = tf.placeholder(tf.float32, [None, n_classes], name="y")
 
-    W1 = tf.Variable(tf.random_normal([n_dim, n_hidden_units_one]))
-    b1 = tf.Variable(tf.random_normal([n_hidden_units_one]))
-    layer1 = tf.nn.tanh(tf.matmul(X, W1) + b1)
+    W1 = tf.Variable(tf.random_normal([n_dim, n_hidden_units_one]), name="input_weight")
+    b1 = tf.Variable(tf.random_normal([n_hidden_units_one]), name="input_bias")
+    layer1 = tf.nn.tanh(tf.matmul(X, W1) + b1, name="input_layer")
 
     W2 = tf.Variable(tf.random_normal(
-        [n_hidden_units_one, n_hidden_units_two]))
-    b2 = tf.Variable(tf.random_normal([n_hidden_units_two]))
-    layer2 = tf.nn.sigmoid(tf.matmul(layer1, W2) + b2)
+        [n_hidden_units_one, n_hidden_units_two]), name="hidden_weight")
+    b2 = tf.Variable(tf.random_normal([n_hidden_units_two]), name="hidden_bias")
+    layer2 = tf.nn.sigmoid(tf.matmul(layer1, W2) + b2, name="hidden_layer")
 
-    W = tf.Variable(tf.random_normal([n_hidden_units_two, n_classes]))
-    b = tf.Variable(tf.random_normal([n_classes]))
-    hypothesis = tf.nn.softmax(tf.matmul(layer2, W) + b)
+    W = tf.Variable(tf.random_normal([n_hidden_units_two, n_classes]), name="output_weight")
+    b = tf.Variable(tf.random_normal([n_classes]), name="output_bias")
+    hypothesis = tf.nn.sigmoid(tf.matmul(layer2, W) + b, name="output_layer")
 
-    cost_function = -tf.reduce_sum(Y * tf.log(hypothesis))
+    # Cont approx of hamming loss
+    cost_function = tf.reduce_mean(Y*(1-hypothesis) + (1-Y)*hypothesis, name="hamming_loss")
     optimizer = tf.train.GradientDescentOptimizer(learning_rate).minimize(
         cost_function)
 
-    predicted = tf.cast(hypothesis > 0.5, dtype=tf.float32)
+    predicted = tf.cast(hypothesis > 0.5, dtype=tf.float32, name="predictions")
     intermediate = tf.equal(predicted, Y)
-    accuracy = tf.reduce_mean(tf.cast(intermediate, dtype=tf.float32))
+    accuracy = tf.reduce_mean(tf.cast(intermediate, dtype=tf.float32), name="accuracy")
 
     y_true, y_pred = None, None
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
+        writer = tf.summary.FileWriter('./graphs', sess.graph)
 
         for epoch in range(training_epochs):
             _, cost = sess.run([optimizer, cost_function],
                                feed_dict={X: train_x, Y: train_y})
 
             if epoch % 5000 == 0:
-                inter, raw, acc = sess.run(
-                            [intermediate, hypothesis, accuracy],
+                inter, pred, raw, acc = sess.run(
+                            [intermediate, predicted, hypothesis, accuracy],
                             feed_dict={X: test_x,
                                        Y: test_y})
-                print("Raw:\n", raw)
-                print("Compare is:\n", inter)
-                print("Accuracy is: ", acc, "%")
-                print("Current Cost: ", cost)
-                print("Current Iter: ", epoch)
+                
+        print("Accuracy is: ", acc, "%")
+        print("Hamming Loss: ", cost)
+
+        return acc, cost, pred
 
 
 def make_csv():
@@ -111,10 +116,13 @@ def make_csv():
     train = np.hstack([train_X, train_y])
     test = np.hstack([test_X, test_y])
 
+    print("Train shape: ", train.shape)
+    print("Test shape: ", test.shape)
+    
     irmas_all = np.vstack([train, test])
     
     data = pd.DataFrame(data=irmas_all, columns=features)
-    data.to_csv("data/gel-pia-sax[MFCC][MEL][53].csv", index=False)
+    data.to_csv("data/gel-pia-sax[MFCC][MFCC_BANDS][SPEC][59].csv", index=False)
 
 
 
@@ -122,7 +130,7 @@ def main():
     print("Reading Files...")
 
     # Load Features
-    data = pd.read_csv("data/gel-pia-sax[MFCC][MEL][53].csv")
+    data = pd.read_csv("data/gel-pia-sax[MFCC][MFCC_BANDS][SPEC][59].csv")
 
     print("Done!\nProcessing files...")
     
@@ -147,25 +155,59 @@ def main():
     # Dumb Binary Encoding!!!
     train_y[:] = [one_hot_encode(instance) for instance in train_y]
     test_y[:] = [one_hot_encode(instance) for instance in test_y]
+    train_y = train_y.astype(float)
+    test_y = test_y.astype(float)
     
     # Scale Data
-    ss = StandardScaler()
-    train_X = ss.fit_transform(train_X)
-    test_X = ss.transform(test_X)
+    mms = MinMaxScaler()
+    train_X = mms.fit_transform(train_X)
+    test_X = mms.transform(test_X)
 
     # Shuffle the training data just in case...
     train = np.append(train_X, train_y, axis=1)
     np.random.shuffle(train)
-    print(train.shape)
     
-    trainX = train[:, :-3]
+    train_X = train[:, :-3]
     train_y = train[:, -3:]
-    print(train_y.shape)
 
     print("Done Processing!!!")
     print("Training MNN...")
 
-    MNN(train_X, train_y, test_X, test_y)
+    # CrossFold validation, test set only for FINAL evaluation
 
+    accuracys = []
+    costs = []
+    precissions = []
+    recalls = []
+
+    kfolds = KFold(n_splits=3, shuffle=True, random_state=42)
+    for train_index, test_index in kfolds.split(train_X, train_y):
+        train_X_folds = train_X[train_index]
+        train_y_folds = train_y[train_index]
+        test_X_folds = train_X[test_index]
+        test_y_folds = train_y[test_index]
+        
+        acc, cost, pred = MNN(train_X_folds, train_y_folds, test_X_folds, test_y_folds)
+        accuracys.append(acc)
+        costs.append(cost)
+
+        pred = pred.astype(float)
+
+        prec1 = precision_score(test_y_folds[:,0], pred[:, 0])
+        prec2 = precision_score(test_y_folds[:,1], pred[:, 1])
+        prec3 = precision_score(test_y_folds[:,2], pred[:, 2])
+        
+        precissions.append(np.mean([prec1, prec2, prec3]))
+
+        rec1 = recall_score(test_y_folds[:,0], pred[:, 0])
+        rec2 = recall_score(test_y_folds[:,1], pred[:, 1])
+        rec3 = recall_score(test_y_folds[:,2], pred[:, 2])
+
+        recalls.append(np.mean([rec1, rec2, rec3]))
+
+    print("Accuracys: ", accuracys)
+    print("Costs: ", costs)
+    print("Precissions: ", precissions)
+    print("Recalls: ", recalls)
 
 main()

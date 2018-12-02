@@ -1,6 +1,6 @@
 import essentia
 import numpy as np
-from essentia.streaming import *
+from essentia.standard import *
 import os
 import re
 
@@ -41,37 +41,67 @@ class FeatureExtractor():
 
     def __list_files(self, path):
         return tuple(os.listdir(path))
+    
 
     def __extract_features(self, file, folder):
         full_file_path = folder + file
         
+        # NEW
         file_loader = MonoLoader(filename=full_file_path)
-        frameCutter = FrameCutter(frameSize=1024, hopSize=512)
-        w = Windowing(type='hann')
-
-        spec = Spectrum()
-        specCont = SpectralContrast()
+        
+        file_audio = file_loader()
+        
+        window = Windowing(type='hann')
+        spectrum = Spectrum()
         mfcc = MFCC()
+        spec_cont = SpectralContrast()
 
         pool = essentia.Pool()
 
-        file_loader.audio >> frameCutter.signal
-        frameCutter.frame >> w.frame >> spec.frame
 
-        spec.spectrum >> mfcc.spectrum
-        mfcc.bands >> (pool, 'lowlevel.mel_bands')
-        mfcc.mfcc >> (pool, 'lowlevel.mfcc')
+        for frame in FrameGenerator(file_audio, frameSize=2048, hopSize=512, startFromZero=True):
+            spec = spectrum(window(frame))
+            
+            # MFCC
+            mfcc_bands, mfcc_coeffs = mfcc(spec)
 
-        essentia.run(file_loader)
+            # Spectral Contrast
+            spec_coef, spec_valley = spec_cont(spec)
+            
+            # Save
+            pool.add('lowlevel.mfcc', mfcc_coeffs)
+            pool.add('lowlevel.mfcc_bands', mfcc_bands)
+            pool.add('lowlevel.spec', spec_coef)
 
-        return pool['lowlevel.mfcc'], pool['lowlevel.mel_bands']
+        # OLD
+        
+        # file_loader = MonoLoader(filename=full_file_path)
+        # frameCutter = FrameCutter(frameSize=1024, hopSize=512)
+        # w = Windowing(type='hann')
+
+        # spec = Spectrum()
+        # specCont = SpectralContrast()
+        # mfcc = MFCC()
+
+        # pool = essentia.Pool()
+
+        # file_loader.audio >> frameCutter.signal
+        # frameCutter.frame >> w.frame >> spec.frame
+
+        # spec.spectrum >> mfcc.spectrum
+        # mfcc.bands >> (pool, 'lowlevel.mel_bands')
+        # mfcc.mfcc >> (pool, 'lowlevel.mfcc')
+
+        # essentia.run(file_loader)
+
+        return pool['lowlevel.mfcc'], pool['lowlevel.mfcc_bands'], pool['lowlevel.spec']
 
 
     def load_training_data(self):
         """
         Reads trainPath and tainFolders to parse traning files
         """
-        data = np.empty((0, 53))
+        data = np.empty((0, 59))
         labels = np.empty((0, self.num_classes))
         for folder in self.train_folders:
             files_in_folder = self.__list_files(self.train_path + folder)
@@ -87,11 +117,12 @@ class FeatureExtractor():
                 while len(file_label) < self.num_classes:
                     file_label.append('')
 
-                mfccs, mel_bands = self.__extract_features(file, self.train_path + folder)
+                mfccs, mel_bands, specs = self.__extract_features(file, self.train_path + folder)
                 mfccs = np.mean(mfccs, axis=0)
                 mel_bands = np.mean(mel_bands, axis=0)
+                specs = np.mean(specs, axis=0)
 
-                features = np.hstack([mfccs, mel_bands])
+                features = np.hstack([mfccs, mel_bands, specs])
                 data = np.vstack([data, features])
                 labels = np.vstack((labels, file_label))
 
@@ -104,7 +135,7 @@ class FeatureExtractor():
         """
         Reads testPath and testFolder to parse test folders
         """
-        data = np.empty((0, 53))
+        data = np.empty((0, 59))
         labels = np.empty((0, self.num_classes))
 
         for folder in self.test_folders:
@@ -129,9 +160,10 @@ class FeatureExtractor():
                 if not isValid:
                     continue
 
-                mfccs, bands = self.__extract_features(file + ".wav", self.test_path + folder)
+                mfccs, bands, specs = self.__extract_features(file + ".wav", self.test_path + folder)
                 mfccs = np.mean(mfccs, axis=0)
                 bands = np.mean(bands, axis=0)
+                specs = np.mean(specs, axis=0)
 
                 for label in list(file_label):
                     if label + "/" in self.train_folders:
@@ -142,7 +174,7 @@ class FeatureExtractor():
                 while len(file_label) < 3:
                     file_label.append('')
 
-                features = np.hstack([mfccs, bands])
+                features = np.hstack([mfccs, bands, specs])
                 data = np.vstack([data, features])
                 labels = np.vstack([labels, file_label])
 
