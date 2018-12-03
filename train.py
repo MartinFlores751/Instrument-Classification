@@ -39,7 +39,7 @@ def one_hot_encode(labels):
     return final_label
 
 
-def MNN(train_x, train_y, test_x, test_y):
+def MNN(train_x, train_y, test_x, test_y, num):
     tf.reset_default_graph()
     
     training_epochs = 20000
@@ -75,6 +75,8 @@ def MNN(train_x, train_y, test_x, test_y):
     intermediate = tf.equal(predicted, Y)
     accuracy = tf.reduce_mean(tf.cast(intermediate, dtype=tf.float32), name="accuracy")
 
+    saver = tf.train.Saver()
+
     y_true, y_pred = None, None
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
@@ -89,7 +91,7 @@ def MNN(train_x, train_y, test_x, test_y):
                             [intermediate, predicted, hypothesis, accuracy],
                             feed_dict={X: test_x,
                                        Y: test_y})
-                
+        saver.save(sess, './model-data/MLP-pred-' + str(num))
         print("Accuracy is: ", acc, "%")
         print("Hamming Loss: ", cost)
 
@@ -181,13 +183,14 @@ def main():
     recalls = []
 
     kfolds = KFold(n_splits=3, shuffle=True, random_state=42)
+    num = 1
     for train_index, test_index in kfolds.split(train_X, train_y):
         train_X_folds = train_X[train_index]
         train_y_folds = train_y[train_index]
         test_X_folds = train_X[test_index]
         test_y_folds = train_y[test_index]
         
-        acc, cost, pred = MNN(train_X_folds, train_y_folds, test_X_folds, test_y_folds)
+        acc, cost, pred = MNN(train_X_folds, train_y_folds, test_X_folds, test_y_folds, num)
         accuracys.append(acc)
         costs.append(cost)
 
@@ -204,6 +207,7 @@ def main():
         rec3 = recall_score(test_y_folds[:,2], pred[:, 2])
 
         recalls.append(np.mean([rec1, rec2, rec3]))
+        num = num + 1
 
     print("Accuracys: ", accuracys)
     print("Costs: ", costs)
