@@ -1,7 +1,7 @@
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import KFold
-from sklearn.metrics import precision_score, recall_score
+from sklearn.metrics import precision_score, recall_score, f1_score
 
 # from tools.dataset import FeatureExtractor
 
@@ -39,7 +39,7 @@ def one_hot_encode(labels):
     return final_label
 
 
-def MNN(train_x, train_y, test_x, test_y, num):
+def MLP(train_x, train_y, test_x, test_y, folder):
     tf.reset_default_graph()
     
     training_epochs = 20000
@@ -80,7 +80,7 @@ def MNN(train_x, train_y, test_x, test_y, num):
     y_true, y_pred = None, None
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
-        writer = tf.summary.FileWriter('./graphs', sess.graph)
+        writer = tf.summary.FileWriter('./model-data/' + folder, sess.graph)
 
         for epoch in range(training_epochs):
             _, cost = sess.run([optimizer, cost_function],
@@ -91,7 +91,7 @@ def MNN(train_x, train_y, test_x, test_y, num):
                             [intermediate, predicted, hypothesis, accuracy],
                             feed_dict={X: test_x,
                                        Y: test_y})
-        saver.save(sess, './model-data/MLP-pred-' + str(num))
+        saver.save(sess, './model-data/' + folder + 'MLP')
         print("Accuracy is: ", acc, "%")
         print("Hamming Loss: ", cost)
 
@@ -138,32 +138,23 @@ def main():
     
     # Split data
     train = data[:2107]
-    test = data[2107:]
 
     train_X = train.drop(["class_1", "class_2", "class_3"], axis=1)
     train_y = train[["class_1", "class_2", "class_3"]]
 
-    test_X = test.drop(["class_1", "class_2", "class_3"], axis=1)
-    test_y = test[["class_1", "class_2", "class_3"]]
-
     # Fill in the empty values
     train_y = train_y.fillna("")
-    test_y = test_y.fillna("")
 
     # DataFram to np.array
     train_y = train_y.values
-    test_y = test_y.values
 
     # Dumb Binary Encoding!!!
     train_y[:] = [one_hot_encode(instance) for instance in train_y]
-    test_y[:] = [one_hot_encode(instance) for instance in test_y]
     train_y = train_y.astype(float)
-    test_y = test_y.astype(float)
     
     # Scale Data
     mms = MinMaxScaler()
     train_X = mms.fit_transform(train_X)
-    test_X = mms.transform(test_X)
 
     # Shuffle the training data just in case...
     train = np.append(train_X, train_y, axis=1)
@@ -173,7 +164,7 @@ def main():
     train_y = train[:, -3:]
 
     print("Done Processing!!!")
-    print("Training MNN...")
+    print("Training MLP...")
 
     # CrossFold validation, test set only for FINAL evaluation
 
@@ -181,6 +172,7 @@ def main():
     costs = []
     precissions = []
     recalls = []
+    f1_scores = []
 
     kfolds = KFold(n_splits=3, shuffle=True, random_state=42)
     num = 1
@@ -190,7 +182,9 @@ def main():
         test_X_folds = train_X[test_index]
         test_y_folds = train_y[test_index]
         
-        acc, cost, pred = MNN(train_X_folds, train_y_folds, test_X_folds, test_y_folds, num)
+        acc, cost, pred = MLP(train_X_folds, train_y_folds,
+                              test_X_folds, test_y_folds,
+                              "MLP-" + str(num) + "/")
         accuracys.append(acc)
         costs.append(cost)
 
@@ -207,11 +201,21 @@ def main():
         rec3 = recall_score(test_y_folds[:,2], pred[:, 2])
 
         recalls.append(np.mean([rec1, rec2, rec3]))
+
+        f1_sc1 = f1_score(test_y_folds[:,0], pred[:,0])
+        f1_sc2 = f1_score(test_y_folds[:,1], pred[:,1])
+        f1_sc3 = f1_score(test_y_folds[:,2], pred[:,2])
+
+        f1_scores.append(np.mean([f1_sc1, f1_sc2, f1_sc3]))
+        
         num = num + 1
 
     print("Accuracys: ", accuracys)
     print("Costs: ", costs)
     print("Precissions: ", precissions)
     print("Recalls: ", recalls)
+    print("F1 Scores: ", f1_scores)
 
-main()
+
+if __name__ == "__main__":
+    main()
