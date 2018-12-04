@@ -74,6 +74,7 @@ def MLP(train_x, train_y, test_x, test_y, folder):
     predicted = tf.cast(hypothesis > 0.5, dtype=tf.float32, name="predictions")
     intermediate = tf.equal(predicted, Y)
     accuracy = tf.reduce_mean(tf.cast(intermediate, dtype=tf.float32), name="accuracy")
+    accuracy_summary = tf.summary.scalar(name="accuracy_summary", tensor=accuracy)
 
     saver = tf.train.Saver()
 
@@ -83,16 +84,19 @@ def MLP(train_x, train_y, test_x, test_y, folder):
         writer = tf.summary.FileWriter('./model-data/' + folder, sess.graph)
 
         for epoch in range(training_epochs):
-            _, cost = sess.run([optimizer, cost_function],
+            _, cost, acc_sum = sess.run([optimizer, cost_function, accuracy_summary],
                                feed_dict={X: train_x, Y: train_y})
 
-            if epoch % 5000 == 0:
-                inter, pred, raw, acc = sess.run(
-                            [intermediate, predicted, hypothesis, accuracy],
-                            feed_dict={X: test_x,
-                                       Y: test_y})
+            if epoch + 1 % 5000 == 0 or epoch == 1:
+                writer.add_summary(acc_sum, epoch)
+
+        inter, pred, raw, acc = sess.run(
+            [intermediate, predicted, hypothesis, accuracy],
+            feed_dict={X: test_x,
+                       Y: test_y})
+        
         saver.save(sess, './model-data/' + folder + 'MLP')
-        print("Accuracy is: ", acc, "%")
+        print("Accuracy is: ", acc * 100, "%")
         print("Hamming Loss: ", cost)
 
         return acc, cost, pred

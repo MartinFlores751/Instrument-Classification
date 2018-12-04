@@ -1,6 +1,6 @@
 from train import one_hot_encode
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.metrics import precision_score, recall_score
+from sklearn.metrics import precision_score, recall_score, f1_score
 
 import pandas as pd
 import numpy as np
@@ -75,6 +75,12 @@ def main():
         rec3 = recall_score(test_y[:,2], pred[:, 2])
 
         print("Recall: ", np.mean([rec1, rec2, rec3]))
+
+        f1_sc1 = f1_score(test_y[:,0], pred[:,0])
+        f1_sc2 = f1_score(test_y[:,1], pred[:,1])
+        f1_sc3 = f1_score(test_y[:,2], pred[:,2])
+
+        print("F1 Score: ", np.mean([f1_sc1, f1_sc2, f1_sc3]))
 
 
 if __name__ == "__main__":
